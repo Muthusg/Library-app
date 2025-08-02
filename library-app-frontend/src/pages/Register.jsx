@@ -7,36 +7,12 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 const Register = () => {
-<<<<<<< HEAD
-  const [form, setForm] = useState({
-    username: "",
-    email: "",
-    password: "",
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const navigate = useNavigate();
-
-  const validateEmail = (email) => {
-    const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return pattern.test(email);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!validateEmail(form.email)) {
-      toast.error("Please enter a valid email.");
-      return;
-    }
-
-=======
   const [form, setForm] = useState({ username: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
->>>>>>> cd491b411cbcf393b08d5ac860ffc55232e52e99
     try {
       const res = await axios.post("http://localhost:5000/auth/register", form);
 
@@ -63,16 +39,6 @@ const Register = () => {
           onChange={(e) => setForm({ ...form, username: e.target.value })}
           required
         />
-<<<<<<< HEAD
-        <input
-          type="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          required
-        />
-=======
->>>>>>> cd491b411cbcf393b08d5ac860ffc55232e52e99
         <div className="password-group">
           <input
             type={showPassword ? "text" : "password"}

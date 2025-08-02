@@ -2,12 +2,20 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
+<<<<<<< HEAD
 import "../styles/AuthForm.css";
+=======
+import '../styles/AuthForm.css';
+>>>>>>> cd491b411cbcf393b08d5ac860ffc55232e52e99
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 const Login = ({ setToken, setUsername }) => {
+<<<<<<< HEAD
   const [form, setForm] = useState({ identifier: "", password: "" }); // identifier = username or email
+=======
+  const [form, setForm] = useState({ username: "", password: "" });
+>>>>>>> cd491b411cbcf393b08d5ac860ffc55232e52e99
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
@@ -15,11 +23,19 @@ const Login = ({ setToken, setUsername }) => {
     e.preventDefault();
     try {
       const res = await axios.post("http://localhost:5000/auth/login", form);
+<<<<<<< HEAD
 
       if (res?.data?.token) {
         localStorage.setItem("token", res.data.token);
         setToken(res.data.token);
         setUsername(res.data.username); // should come from backend
+=======
+      
+      if (res?.data?.token) {
+        localStorage.setItem("token", res.data.token);
+        setToken(res.data.token);
+        setUsername(form.username);
+>>>>>>> cd491b411cbcf393b08d5ac860ffc55232e52e99
         navigate("/");
         toast.success("Login successful!");
       } else {
@@ -37,9 +53,15 @@ const Login = ({ setToken, setUsername }) => {
         <h2>Login</h2>
         <input
           type="text"
+<<<<<<< HEAD
           placeholder="Username or Email"
           value={form.identifier}
           onChange={(e) => setForm({ ...form, identifier: e.target.value })}
+=======
+          placeholder="Username"
+          value={form.username}
+          onChange={(e) => setForm({ ...form, username: e.target.value })}
+>>>>>>> cd491b411cbcf393b08d5ac860ffc55232e52e99
           required
         />
         <div className="password-group">

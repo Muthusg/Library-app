@@ -1,4 +1,3 @@
-// src/pages/Register.jsx
 import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
@@ -7,7 +6,11 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 const Register = () => {
-  const [form, setForm] = useState({ username: "", password: "" });
+  const [form, setForm] = useState({
+    username: "",
+    email: "",
+    password: "",
+  });
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
@@ -32,6 +35,7 @@ const Register = () => {
     <div className="auth-container">
       <form onSubmit={handleSubmit} className="auth-form">
         <h2>Register</h2>
+
         <input
           type="text"
           placeholder="Username"
@@ -39,6 +43,15 @@ const Register = () => {
           onChange={(e) => setForm({ ...form, username: e.target.value })}
           required
         />
+
+        <input
+          type="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          required
+        />
+
         <div className="password-group">
           <input
             type={showPassword ? "text" : "password"}
@@ -54,6 +67,7 @@ const Register = () => {
             {showPassword ? <FaEyeSlash /> : <FaEye />}
           </span>
         </div>
+
         <button type="submit">Register</button>
         <p>
           Already have an account? <Link to="/login">Login</Link>

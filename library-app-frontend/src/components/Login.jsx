@@ -16,11 +16,25 @@ const Login = ({ setToken, setUsername }) => {
     try {
       const res = await axios.post("http://localhost:5000/auth/login", form);
 
-      if (res?.data?.token) {
-        localStorage.setItem("token", res.data.token);
-        setToken(res.data.token);
-        setUsername(res.data.username); // should come from backend
-        navigate("/");
+      if (res?.data?.token && res?.data?.user) {
+        const { token, user } = res.data;
+        const { username, role } = user;
+
+        // ✅ Store in localStorage
+        localStorage.setItem("token", token);
+        localStorage.setItem("username", username);
+        localStorage.setItem("role", role);
+
+        setToken(token);
+        setUsername(username);
+
+        // ✅ Redirect based on role
+        if (role === 'admin') {
+          navigate("/adminpanel");
+        } else {
+          navigate("/");
+        }
+
         toast.success("Login successful!");
       } else {
         toast.error("Unexpected response from server.");

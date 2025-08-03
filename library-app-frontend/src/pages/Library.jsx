@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
-import API from '../api';
+import API from '../api'; // ✅ Use API instance
 
 function Library() {
   const [books, setBooks] = useState([]);
@@ -11,6 +11,7 @@ function Library() {
   const [currentPage, setCurrentPage] = useState(1);
   const booksPerPage = 4;
   const navigate = useNavigate();
+
   const username = localStorage.getItem('username');
 
   const fetchBooks = async () => {
@@ -24,11 +25,12 @@ function Library() {
 
   const issueBook = async (id) => {
     try {
-      await API.put(`/books/${id}/issue`);
-      toast.success('Book issued');
-      fetchBooks();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Error issuing');
+      const res = await API.put(`/books/${id}/issue`);
+      toast.success(res.data.message);
+      fetchBooks(); // ✅ Refresh list
+    } catch (err) {
+      console.error('Issue book error:', err);
+      toast.error(err.response?.data?.message || 'Error issuing book');
     }
   };
 
@@ -53,7 +55,7 @@ function Library() {
     fetchBooks();
   }, []);
 
-  const filteredBooks = books.filter(book => {
+  const filteredBooks = books.filter((book) => {
     const matchesSearch = book.title.toLowerCase().includes(search.toLowerCase());
     const matchesFilter =
       filter === 'all' ||
@@ -72,7 +74,7 @@ function Library() {
       <div className="navbar">
         <h1>📚 Mini Library App</h1>
         <div className="user-info">
-          <span>👤 {username}</span>
+          <span>👤 {username || 'User'}</span>
           <button className="logout-btn" onClick={logout}>Logout</button>
         </div>
       </div>
@@ -80,7 +82,7 @@ function Library() {
       <div className="top-bar">
         <input
           type="text"
-          placeholder="Search..."
+          placeholder="Search books..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -92,31 +94,33 @@ function Library() {
       </div>
 
       <div className="book-list">
-        {visibleBooks.map(book => (
-          <div key={book.id} className="book-card">
-            <img src={book.cover} alt={book.title} />
-            <div className="book-title">{book.title}</div>
-            <div className="book-author">by {book.author}</div>
-            <div className={`status ${book.issued ? 'issued' : 'available'}`}>
-              {book.issued ? 'Issued' : 'Available'}
+        {visibleBooks.map((book) => (
+          <div key={book._id || book.id} className="book-card">
+            <img src={book.cover} alt={book.title} className="book-cover" />
+            <div className="book-info">
+              <div className="book-title">{book.title}</div>
+              <div className="book-author">by {book.author}</div>
+              <div className={`status ${book.issued ? 'issued' : 'available'}`}>
+                {book.issued ? 'Issued' : 'Available'}
+              </div>
+              {!book.issued ? (
+                <button className="issue-button" onClick={() => issueBook(book._id || book.id)}>Issue</button>
+              ) : (
+                <button className="return-button" onClick={() => returnBook(book._id || book.id)}>Return</button>
+              )}
             </div>
-            {!book.issued ? (
-              <button className="issue-button" onClick={() => issueBook(book.id)}>Issue</button>
-            ) : (
-              <button className="return-button" onClick={() => returnBook(book.id)}>Return</button>
-            )}
           </div>
         ))}
       </div>
 
-      {totalPages > 0 && (
+      {totalPages > 1 && (
         <div className="pagination">
           {currentPage > 1 && (
-            <button onClick={() => setCurrentPage(p => p - 1)}>◀ Prev</button>
+            <button onClick={() => setCurrentPage((p) => p - 1)}>◀ Prev</button>
           )}
           <span>Page {currentPage} of {totalPages}</span>
           {currentPage < totalPages && (
-            <button onClick={() => setCurrentPage(p => p + 1)}>Next ▶</button>
+            <button onClick={() => setCurrentPage((p) => p + 1)}>Next ▶</button>
           )}
         </div>
       )}

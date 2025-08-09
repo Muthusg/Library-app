@@ -1,113 +1,254 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const dotenv = require('dotenv');
-dotenv.config();
-
+const Book = require('../models/Book');
 const User = require('../models/User');
 const { verifyToken } = require('../middleware/authMiddleware');
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-// =================== REGISTER USER ===================
-router.post('/register', async (req, res) => {
+// POST /books - Add a new book
+router.post('/', verifyToken, async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const {
+      title,
+      author,
+      cover,
+      category,
+      totalCopies,
+      description,
+    } = req.body;
 
-    // Basic validation
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: 'All fields are required' });
+    if (!title || !author || !totalCopies) {
+      return res.status(400).json({ message: 'Title, author and totalCopies are required' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
-    }
-
-    // Check for existing user
-    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Username or email already exists' });
-    }
-
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create new user
-    const newUser = new User({
-      username,
-      email,
-      password: hashedPassword,
+    const newBook = new Book({
+      title,
+      author,
+      cover: cover || '',
+      category: category || 'Uncategorized',
+      totalCopies,
+      issuedCopies: 0,
+      description: description || '',
+      isIssued: false,
+      issuedBy: null,
+      issuedDate: null,
+      dueDate: null,
     });
 
-    await newUser.save();
+    await newBook.save();
 
-    res.status(201).json({ message: 'Registration successful' });
+    res.status(201).json(newBook);
   } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({ message: 'Server error during registration' });
+    console.error('Add new book error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// =================== USER LOGIN ===================
-router.post('/login', async (req, res) => {
+// PUT /books/:id - Update an existing book by ID
+router.put('/:id', verifyToken, async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const bookId = req.params.id;
+    const {
+      title,
+      author,
+      cover,
+      category,
+      totalCopies,
+      description,
+    } = req.body;
 
-    // Validate input
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Username and password are required' });
+    if (!title || !author || !totalCopies) {
+      return res.status(400).json({ message: 'Title, author and totalCopies are required' });
     }
 
-    // Find user
-    const user = await User.findOne({ username });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+    const book = await Book.findById(bookId);
+    if (!book) return res.status(404).json({ message: 'Book not found' });
+
+    // Update fields
+    book.title = title;
+    book.author = author;
+    book.cover = cover || '';
+    book.category = category || 'Uncategorized';
+    book.totalCopies = totalCopies;
+    book.description = description || '';
+
+    // Adjust issuedCopies if needed (cannot exceed totalCopies)
+    if (book.issuedCopies > totalCopies) {
+      book.issuedCopies = totalCopies;
     }
 
-    // Match password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+    await book.save();
+
+    res.json(book);
+  } catch (err) {
+    console.error('Update book error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /books - List all books with user's issued status and availability info
+router.get('/', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const books = await Book.find();
+
+    const booksWithStatus = books.map(book => {
+      const isIssuedByUser = user.issuedBooks.some(
+        issuedBookId => issuedBookId.toString() === book._id.toString()
+      );
+
+      return {
+        _id: book._id,
+        title: book.title,
+        author: book.author,
+        cover: book.cover,
+        category: book.category || 'Uncategorized',
+        totalCopies: book.totalCopies,
+        issuedCopies: book.issuedCopies,
+        availableCopies: book.totalCopies - (book.issuedCopies || 0),
+        issuedByUser: isIssuedByUser,
+        dueDate: isIssuedByUser ? book.dueDate : null,
+      };
+    });
+
+    res.json(booksWithStatus);
+  } catch (err) {
+    console.error('Error fetching books:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /books/mybooks - List books issued by the logged-in user
+router.get('/mybooks', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId).populate('issuedBooks');
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    res.json(user.issuedBooks);
+  } catch (err) {
+    console.error('Error fetching user issued books:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /books/:id/issue - Issue a book to logged-in user
+router.post('/:id/issue', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookId = req.params.id;
+
+    const user = await User.findById(userId).populate('issuedBooks');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (user.issuedBooks.length >= 3) {
+      return res.status(400).json({ message: 'Book issue limit reached (max 3)' });
     }
 
-    // Generate token
-    const token = jwt.sign(
-      {
-        id: user._id,
-        username: user.username,
-        role: user.role,
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
+    const book = await Book.findById(bookId);
+    if (!book) return res.status(404).json({ message: 'Book not found' });
+
+    if (book.issuedCopies >= book.totalCopies) {
+      return res.status(400).json({ message: 'No available copies for this book' });
+    }
+
+    const alreadyIssued = user.issuedBooks.some(
+      issuedBook => issuedBook._id.toString() === bookId
+    );
+    if (alreadyIssued) {
+      return res.status(400).json({ message: 'You have already issued this book' });
+    }
+
+    const issueDate = new Date();
+    const dueDate = new Date();
+    dueDate.setDate(issueDate.getDate() + 7); // 7 days due
+
+    book.issuedCopies += 1;
+    book.isIssued = book.issuedCopies > 0;
+    book.issuedBy = userId;
+    book.issuedDate = issueDate;
+    book.dueDate = dueDate;
+    await book.save();
+
+    user.issuedBooks.push(book._id);
+    await user.save();
+
+    const remainingBooks = 3 - user.issuedBooks.length;
+
+    res.json({
+      message: 'Book issued successfully',
+      book,
+      remainingBooks,
+    });
+  } catch (err) {
+    console.error('Issue book error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /books/:id/return - Return a book
+router.post('/:id/return', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookId = req.params.id;
+
+    const book = await Book.findById(bookId);
+    if (!book) return res.status(404).json({ message: 'Book not found' });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (!user.issuedBooks.some(id => id.toString() === bookId)) {
+      return res.status(400).json({ message: 'You have not issued this book' });
+    }
+
+    book.issuedCopies = Math.max(book.issuedCopies - 1, 0);
+    book.isIssued = book.issuedCopies > 0;
+
+    if (book.issuedCopies === 0) {
+      book.issuedBy = null;
+      book.issuedDate = null;
+      book.dueDate = null;
+    }
+    await book.save();
+
+    user.issuedBooks = user.issuedBooks.filter(id => id.toString() !== bookId);
+    await user.save();
+
+    const remainingBooks = 3 - user.issuedBooks.length;
+
+    res.json({
+      message: 'Book returned successfully',
+      book,
+      remainingBooks,
+    });
+  } catch (err) {
+    console.error('Return book error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// DELETE /books/:id - Delete a book by ID
+router.delete('/:id', verifyToken, async (req, res) => {
+  try {
+    const bookId = req.params.id;
+    const deletedBook = await Book.findByIdAndDelete(bookId);
+    if (!deletedBook) return res.status(404).json({ message: 'Book not found' });
+
+    // Remove book from users' issuedBooks array
+    await User.updateMany(
+      { issuedBooks: bookId },
+      { $pull: { issuedBooks: bookId } }
     );
 
-    res.status(200).json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
-    });
+    res.json({ message: 'Book deleted successfully' });
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ message: 'Server error during login' });
-  }
-});
-
-// =================== GET AUTHENTICATED USER PROFILE ===================
-router.get('/me', verifyToken, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select('-password');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.status(200).json(user);
-  } catch (err) {
-    console.error('Fetch profile error:', err);
-    res.status(500).json({ message: 'Server error fetching profile' });
+    console.error('Delete book error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

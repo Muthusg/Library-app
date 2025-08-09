@@ -1,83 +1,124 @@
-// src/components/Login.jsx
-import React, { useState } from "react";
-import axios from "axios";
-import { useNavigate, Link } from "react-router-dom";
-import '../styles/AuthForm.css';
+import React, { useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
-import { toast } from "react-toastify";
+import API from "../api";
+import toast from "react-hot-toast";
+import { AuthContext } from "../context/AuthContext";
 
-const Login = ({ setToken, setUsername }) => {
-  const [form, setForm] = useState({ identifier: "", password: "" }); // identifier = username or email
-  const [showPassword, setShowPassword] = useState(false);
+export default function Login() {
   const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
-  const handleSubmit = async (e) => {
+  const [identifier, setIdentifier] = useState(""); // username or email
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setLoading(true);
+
     try {
-      const res = await axios.post("http://localhost:5000/auth/login", form);
+      // Login API expects { identifier, password }
+      const { data } = await API.post("/auth/login", { identifier, password });
 
-      if (res?.data?.token && res?.data?.user) {
-        const { token, user } = res.data;
-        const { username, role } = user;
+      // Assuming backend returns data like { token, user: { id, username, role, ... } }
+      if (!data.token || !data.user) {
+        toast.error("Invalid response from server");
+        setLoading(false);
+        return;
+      }
 
-        // ✅ Store in localStorage
-        localStorage.setItem("token", token);
-        localStorage.setItem("username", username);
-        localStorage.setItem("role", role);
+      // Store token and user info (including role) in AuthContext
+      login(data.token, data.user);
 
-        setToken(token);
-        setUsername(username);
+      toast.success("Login successful!");
 
-        // ✅ Redirect based on role
-        if (role === 'admin') {
-          navigate("/adminpanel");
-        } else {
-          navigate("/");
-        }
-
-        toast.success("Login successful!");
+      // Redirect based on user role
+      if (data.user.role === "admin") {
+        navigate("/admin/Users");
       } else {
-        toast.error("Unexpected response from server.");
+        navigate("/home");
       }
     } catch (err) {
-      const message = err?.response?.data?.message || "Login failed. Try again.";
-      toast.error(message);
+      toast.error(err.response?.data?.message || "Login failed!");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="auth-container">
-      <form onSubmit={handleSubmit} className="auth-form">
-        <h2>Login</h2>
-        <input
-          type="text"
-          placeholder="Username or Email"
-          value={form.identifier}
-          onChange={(e) => setForm({ ...form, identifier: e.target.value })}
-          required
-        />
-        <div className="password-group">
-          <input
-            type={showPassword ? "text" : "password"}
-            placeholder="Password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required
-          />
-          <span
-            className="toggle-password"
-            onClick={() => setShowPassword(!showPassword)}
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
+      <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-md">
+        <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Login</h2>
+
+        <form onSubmit={handleLogin} className="space-y-5">
+          {/* Username or Email */}
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-1">
+              Username or Email
+            </label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="Enter your username or email"
+              required
+            />
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-1">Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none pr-10"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-3 flex items-center text-gray-500"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <FaEyeSlash /> : <FaEye />}
+              </button>
+            </div>
+          </div>
+
+          {/* Links */}
+          <div className="flex justify-between text-sm text-blue-600">
+            <button
+              type="button"
+              onClick={() => navigate("/forgot-password")}
+              className="hover:underline"
+            >
+              Forgot Password?
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/register")}
+              className="hover:underline"
+            >
+              New here? Register
+            </button>
+          </div>
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition"
           >
-            {showPassword ? <FaEyeSlash /> : <FaEye />}
-          </span>
-        </div>
-        <button type="submit">Login</button>
-        <p>
-          Don’t have an account? <Link to="/register">Register</Link>
-        </p>
-      </form>
+            {loading ? "Logging in..." : "Login"}
+          </button>
+        </form>
+      </div>
     </div>
   );
-};
-
-export default Login;
+}

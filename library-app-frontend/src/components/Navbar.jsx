@@ -1,41 +1,52 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import './Navbar.css';
+import React from "react";
+import { Link, useNavigate } from "react-router-dom";
 
-function Navbar({ username, role, setToken }) {
+function Navbar() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('role');
-    if (setToken) setToken(null);
-    navigate('/login');
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    navigate("/login");
   };
 
-  // Prefer passed props over localStorage
-  const displayUsername = username || localStorage.getItem('username') || 'Guest';
-  const userRole = role || localStorage.getItem('role') || 'user';
-
   return (
-    <nav className="navbar-container">
-      <div className="navbar-left">
-        <h2 className="navbar-title">📚 Mini Library App</h2>
-      </div>
+    <nav className="bg-gray-800 text-white shadow-md">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          {/* Logo */}
+          <div className="flex-shrink-0 flex items-center text-xl font-bold cursor-pointer"
+            onClick={() => navigate("/home")}
+          >
+            📚 My Library
+          </div>
 
-      <div className="navbar-right">
-        <span className="user-info">
-          <strong>{displayUsername}</strong> ({userRole === 'admin' ? 'Admin' : 'User'})
-        </span>
+          {/* Menu Links */}
+          <div className="hidden md:flex items-center space-x-6">
+            <Link to="/home" className="hover:text-yellow-400 transition">
+              Home
+            </Link>
+            <Link to="/books" className="hover:text-yellow-400 transition">
+              Books
+            </Link>
+            <Link to="/contact" className="hover:text-yellow-400 transition">
+              Contact
+            </Link>
+            <Link to="/profile" className="hover:text-yellow-400 transition">
+              Profile
+            </Link>
+          </div>
 
-        {userRole === 'admin' && (
-          <button className="navbar-button" onClick={() => navigate('/adminpanel')}>
-            Admin Panel
-          </button>
-        )}
-        <button className="navbar-button logout" onClick={handleLogout}>
-          Logout
-        </button>
+          {/* Logout Button */}
+          <div className="flex items-center">
+            <button
+              onClick={handleLogout}
+              className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-md text-white transition"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
       </div>
     </nav>
   );

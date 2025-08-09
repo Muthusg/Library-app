@@ -1,75 +1,83 @@
-// App.jsx
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import './App.css';
-import { Toaster } from 'react-hot-toast';
+import React from "react";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 
-import Login from './components/Login';
-import Register from './pages/Register';
-import ProtectedRoute from './components/ProtectedRoute';
-import Library from './pages/Library';
-import AdminPanel from './pages/AdminPanel';
-import AdminLogin from './pages/AdminLogin'; // ✅ Make sure this file exists
+// Public pages/components
+import Login from "./components/Login";
+import Register from "./pages/Register";
+
+// User pages/components
+import Books from "./pages/Books";
+import Home from "./pages/Home";
+import Contact from "./pages/Contact";
+import Profile from "./pages/Profile";
+import './index.css';
+
+// Admin pages
+import UsersPage from "./pages/admin/Users";
+import IssuedBooksPage from "./pages/admin/IssuedBooks";
+import UpdateBooksPage from "./pages/admin/UpdateBooks";
+
+// Layouts
+import Navbar from "./components/Navbar";
+import AdminLayout from "./components/AdminLayout";
+
+// Auth protection
+import ProtectedRoute from "./components/ProtectedRoute";
+
+// Layout component wrapping Navbar and rendering child routes for users
+function UserLayout() {
+  return (
+    <>
+      <Navbar />
+      <Outlet />
+    </>
+  );
+}
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [username, setUsername] = useState(localStorage.getItem('username') || '');
-
-  // ✅ Add role state
-  const [role, setRole] = useState(localStorage.getItem('role') || '');
-
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem('token', token);
-    } else {
-      localStorage.removeItem('token');
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (username) {
-      localStorage.setItem('username', username);
-    }
-  }, [username]);
-
-  // ✅ Sync role to localStorage
-  useEffect(() => {
-    if (role) {
-      localStorage.setItem('role', role);
-    }
-  }, [role]);
-
   return (
-    <Router>
-      <Toaster position="top-center" />
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute token={token}>
-              <Library token={token} username={username} setToken={setToken} />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/login" element={<Login setToken={setToken} setUsername={setUsername} />} />
-        <Route path="/register" element={<Register />} />
-        
-        {/* ✅ Pass setRole and setUsername to AdminLogin */}
-        <Route path="/adminlogin" element={<AdminLogin setToken={setToken} setRole={setRole} setUsername={setUsername} />} />
+    <Routes>
+      {/* Default redirect from "/" */}
+      <Route path="/" element={<Navigate to="/home" replace />} />
 
-        {/* ✅ Pass role to AdminPanel */}
-        <Route
-          path="/adminpanel"
-          element={
-            <ProtectedRoute token={token}>
-              <AdminPanel token={token} setToken={setToken} username={username} role={role} />
-            </ProtectedRoute>
-          }
-        />
+      {/* Public routes */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
-        <Route path="*" element={<Navigate to={token ? '/' : '/login'} />} />
-      </Routes>
-    </Router>
+      {/* User protected routes wrapped inside Layout */}
+      <Route
+        element={
+          <ProtectedRoute role="user">
+            <UserLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/home" element={<Home />} />
+        <Route path="/books" element={<Books />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/profile" element={<Profile />} />
+      </Route>
+
+      {/* Admin protected routes with AdminLayout */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute role="admin">
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        {/* Default admin redirect */}
+        <Route index element={<Navigate to="users" replace />} />
+
+        <Route path="users" element={<UsersPage />} />
+        <Route path="issued-books" element={<IssuedBooksPage />} />
+        <Route path="update-books" element={<UpdateBooksPage />} />
+      </Route>
+
+      {/* Catch-all redirect to /login */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   );
 }
 

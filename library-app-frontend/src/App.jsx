@@ -11,6 +11,8 @@ import Home from "./pages/Home";
 import Contact from "./pages/Contact";
 import Profile from "./pages/Profile";
 import './index.css';
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 // Admin pages
 import UsersPage from "./pages/admin/Users";
@@ -43,6 +45,9 @@ function App() {
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
+
 
       {/* User protected routes wrapped inside Layout */}
       <Route

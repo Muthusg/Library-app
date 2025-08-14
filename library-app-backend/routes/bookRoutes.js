@@ -1,29 +1,38 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const Book = require('../models/Book');
 const User = require('../models/User');
+const BookIssueHistory = require('../models/BookIssueHistory');
+
 const { verifyToken } = require('../middleware/authMiddleware');
 
-// POST /books - Add a new book
+// Utility: Resolve final image URL
+async function resolveFinalUrl(url) {
+  if (!url) return '';
+  try {
+    const response = await axios.head(url, { maxRedirects: 5, validateStatus: null });
+    return response.headers.location || url;
+  } catch {
+    return url;
+  }
+}
+
+// ---------------------
+// ADD NEW BOOK
+// ---------------------
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const {
-      title,
-      author,
-      cover,
-      category,
-      totalCopies,
-      description,
-    } = req.body;
-
-    if (!title || !author || !totalCopies) {
+    const { title, author, cover, category, totalCopies, description } = req.body;
+    if (!title || !author || !totalCopies)
       return res.status(400).json({ message: 'Title, author and totalCopies are required' });
-    }
+
+    const finalCover = await resolveFinalUrl(cover);
 
     const newBook = new Book({
       title,
       author,
-      cover: cover || '',
+      cover: finalCover,
       category: category || 'Uncategorized',
       totalCopies,
       issuedCopies: 0,
@@ -35,7 +44,6 @@ router.post('/', verifyToken, async (req, res) => {
     });
 
     await newBook.save();
-
     res.status(201).json(newBook);
   } catch (err) {
     console.error('Add new book error:', err);
@@ -43,41 +51,30 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
-// PUT /books/:id - Update an existing book by ID
+// ---------------------
+// UPDATE BOOK
+// ---------------------
 router.put('/:id', verifyToken, async (req, res) => {
   try {
-    const bookId = req.params.id;
-    const {
-      title,
-      author,
-      cover,
-      category,
-      totalCopies,
-      description,
-    } = req.body;
-
-    if (!title || !author || !totalCopies) {
+    const { title, author, cover, category, totalCopies, description } = req.body;
+    if (!title || !author || !totalCopies)
       return res.status(400).json({ message: 'Title, author and totalCopies are required' });
-    }
 
-    const book = await Book.findById(bookId);
+    const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: 'Book not found' });
 
-    // Update fields
     book.title = title;
     book.author = author;
-    book.cover = cover || '';
+    book.cover = await resolveFinalUrl(cover);
     book.category = category || 'Uncategorized';
     book.totalCopies = totalCopies;
     book.description = description || '';
 
-    // Adjust issuedCopies if needed (cannot exceed totalCopies)
     if (book.issuedCopies > totalCopies) {
       book.issuedCopies = totalCopies;
     }
 
     await book.save();
-
     res.json(book);
   } catch (err) {
     console.error('Update book error:', err);
@@ -85,21 +82,18 @@ router.put('/:id', verifyToken, async (req, res) => {
   }
 });
 
-// GET /books - List all books with user's issued status and availability info
+// ---------------------
+// GET ALL BOOKS
+// ---------------------
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const user = await User.findById(userId);
-
+    const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const books = await Book.find();
 
     const booksWithStatus = books.map(book => {
-      const isIssuedByUser = user.issuedBooks.some(
-        issuedBookId => issuedBookId.toString() === book._id.toString()
-      );
-
+      const issuedByUser = user.issuedBooks.some(id => id.toString() === book._id.toString());
       return {
         _id: book._id,
         title: book.title,
@@ -109,8 +103,8 @@ router.get('/', verifyToken, async (req, res) => {
         totalCopies: book.totalCopies,
         issuedCopies: book.issuedCopies,
         availableCopies: book.totalCopies - (book.issuedCopies || 0),
-        issuedByUser: isIssuedByUser,
-        dueDate: isIssuedByUser ? book.dueDate : null,
+        issuedByUser,
+        dueDate: issuedByUser ? book.dueDate : null,
       };
     });
 
@@ -121,12 +115,12 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-// GET /books/mybooks - List books issued by the logged-in user
+// ---------------------
+// GET MY ISSUED BOOKS
+// ---------------------
 router.get('/mybooks', verifyToken, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const user = await User.findById(userId).populate('issuedBooks');
-
+    const user = await User.findById(req.user.id).populate('issuedBooks');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     res.json(user.issuedBooks);
@@ -136,53 +130,55 @@ router.get('/mybooks', verifyToken, async (req, res) => {
   }
 });
 
-// POST /books/:id/issue - Issue a book to logged-in user
+// ---------------------
+// ISSUE BOOK
+// ---------------------
 router.post('/:id/issue', verifyToken, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const bookId = req.params.id;
-
-    const user = await User.findById(userId).populate('issuedBooks');
+    const user = await User.findById(req.user.id).populate('issuedBooks');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    if (user.issuedBooks.length >= 3) {
+    if (user.issuedBooks.length >= 3)
       return res.status(400).json({ message: 'Book issue limit reached (max 3)' });
-    }
 
-    const book = await Book.findById(bookId);
+    const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: 'Book not found' });
 
-    if (book.issuedCopies >= book.totalCopies) {
+    if (book.issuedCopies >= book.totalCopies)
       return res.status(400).json({ message: 'No available copies for this book' });
-    }
 
-    const alreadyIssued = user.issuedBooks.some(
-      issuedBook => issuedBook._id.toString() === bookId
-    );
-    if (alreadyIssued) {
+    if (user.issuedBooks.some(b => b._id.toString() === req.params.id))
       return res.status(400).json({ message: 'You have already issued this book' });
-    }
 
     const issueDate = new Date();
     const dueDate = new Date();
-    dueDate.setDate(issueDate.getDate() + 7); // 7 days due
+    dueDate.setDate(issueDate.getDate() + 7);
 
+    // Update book
     book.issuedCopies += 1;
-    book.isIssued = book.issuedCopies > 0;
-    book.issuedBy = userId;
+    book.isIssued = true;
+    book.issuedBy = user._id;
     book.issuedDate = issueDate;
     book.dueDate = dueDate;
     await book.save();
 
+    // Update user
     user.issuedBooks.push(book._id);
     await user.save();
 
-    const remainingBooks = 3 - user.issuedBooks.length;
+    // Save history
+    await BookIssueHistory.create({
+      book: book._id,
+      issuedBy: user._id,
+      action: "issued",
+      issuedDate: issueDate,
+      dueDate
+    });
 
     res.json({
       message: 'Book issued successfully',
       book,
-      remainingBooks,
+      remainingBooks: 3 - user.issuedBooks.length,
     });
   } catch (err) {
     console.error('Issue book error:', err);
@@ -190,25 +186,23 @@ router.post('/:id/issue', verifyToken, async (req, res) => {
   }
 });
 
-// POST /books/:id/return - Return a book
+// ---------------------
+// RETURN BOOK
+// ---------------------
 router.post('/:id/return', verifyToken, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const bookId = req.params.id;
-
-    const book = await Book.findById(bookId);
+    const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: 'Book not found' });
 
-    const user = await User.findById(userId);
+    const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    if (!user.issuedBooks.some(id => id.toString() === bookId)) {
+    if (!user.issuedBooks.some(id => id.toString() === req.params.id))
       return res.status(400).json({ message: 'You have not issued this book' });
-    }
 
+    // Update book
     book.issuedCopies = Math.max(book.issuedCopies - 1, 0);
     book.isIssued = book.issuedCopies > 0;
-
     if (book.issuedCopies === 0) {
       book.issuedBy = null;
       book.issuedDate = null;
@@ -216,15 +210,22 @@ router.post('/:id/return', verifyToken, async (req, res) => {
     }
     await book.save();
 
-    user.issuedBooks = user.issuedBooks.filter(id => id.toString() !== bookId);
+    // Update user
+    user.issuedBooks = user.issuedBooks.filter(id => id.toString() !== req.params.id);
     await user.save();
 
-    const remainingBooks = 3 - user.issuedBooks.length;
+    // Save history
+    await BookIssueHistory.create({
+      book: book._id,
+      issuedBy: user._id,
+      action: "returned",
+      returnedDate: new Date()
+    });
 
     res.json({
       message: 'Book returned successfully',
       book,
-      remainingBooks,
+      remainingBooks: 3 - user.issuedBooks.length,
     });
   } catch (err) {
     console.error('Return book error:', err);
@@ -232,18 +233,16 @@ router.post('/:id/return', verifyToken, async (req, res) => {
   }
 });
 
-// DELETE /books/:id - Delete a book by ID
+// ---------------------
+// DELETE BOOK
+// ---------------------
 router.delete('/:id', verifyToken, async (req, res) => {
   try {
-    const bookId = req.params.id;
-    const deletedBook = await Book.findByIdAndDelete(bookId);
+    const deletedBook = await Book.findByIdAndDelete(req.params.id);
     if (!deletedBook) return res.status(404).json({ message: 'Book not found' });
 
-    // Remove book from users' issuedBooks array
-    await User.updateMany(
-      { issuedBooks: bookId },
-      { $pull: { issuedBooks: bookId } }
-    );
+    // Remove book from users' issuedBooks
+    await User.updateMany({ issuedBooks: req.params.id }, { $pull: { issuedBooks: req.params.id } });
 
     res.json({ message: 'Book deleted successfully' });
   } catch (err) {

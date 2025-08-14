@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const BookSchema = new mongoose.Schema({
   title: { type: String, required: true },
   author: { type: String, required: true },
-  cover: String,
+  cover: { type: String },
+
   totalCopies: {
     type: Number,
     required: true,
@@ -11,14 +12,8 @@ const BookSchema = new mongoose.Schema({
     min: [1, 'Total copies must be at least 1']
   },
   issuedCopies: { type: Number, default: 0 },
-  isIssued: {
-    type: Boolean,
-    default: false
-  },
-  issuedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
+  isIssued: { type: Boolean, default: false },
+  issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   issuedDate: Date,
   dueDate: Date,
   description: { type: String, default: '' },
@@ -35,7 +30,8 @@ const BookSchema = new mongoose.Schema({
       "Adventure",
       "Children",
       "Drama",
-      "Historical"
+      "Historical",
+      "Non-fiction"  
     ],
     default: "Fiction"
   }

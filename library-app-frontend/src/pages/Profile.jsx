@@ -21,13 +21,15 @@ function Profile() {
 
   const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
 
-  // Build image URL with cache-busting
-  const getImageUrl = (path) => {
-    if (!path) return "/images/new-default.jpeg";
-    return path.startsWith("http")
-      ? path
-      : `${API_BASE}${path}?t=${Date.now()}`;
-  };
+  const getImageUrl = useCallback(
+    (path) => {
+      if (!path) return "/images/new-default.jpeg";
+      return path.startsWith("http")
+        ? path
+        : `${API_BASE}${path}?t=${Date.now()}`;
+    },
+    [API_BASE]
+  );
 
   // Use useCallback to stabilize the fetchProfile function
   const fetchProfile = useCallback(async () => {
@@ -51,7 +53,7 @@ function Profile() {
       console.error(err);
       toast.error("Failed to load profile");
     }
-  }, [API_BASE]); // dependency is API_BASE since getImageUrl uses it
+  }, [getImageUrl]);   // dependency is API_BASE since getImageUrl uses it
 
   useEffect(() => {
     fetchProfile();

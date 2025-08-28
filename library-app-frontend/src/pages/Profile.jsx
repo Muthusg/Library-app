@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
 import API from "../api";
 
@@ -29,11 +29,8 @@ function Profile() {
       : `${API_BASE}${path}?t=${Date.now()}`;
   };
 
-  useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
-
-  const fetchProfile = async () => {
+  // Use useCallback to stabilize the fetchProfile function
+  const fetchProfile = useCallback(async () => {
     try {
       const res = await API.get("/auth/profile", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -54,7 +51,11 @@ function Profile() {
       console.error(err);
       toast.error("Failed to load profile");
     }
-  };
+  }, [API_BASE]); // dependency is API_BASE since getImageUrl uses it
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
 
   const handleChange = (e) => {
     setEditData({ ...editData, [e.target.name]: e.target.value });

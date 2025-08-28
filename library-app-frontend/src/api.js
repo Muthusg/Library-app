@@ -1,7 +1,10 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000", // change if backend runs on a different port
+  baseURL:
+    process.env.NODE_ENV === "production"
+      ? "https://library-app-jbyf.onrender.com" // Live backend URL
+      : "http://localhost:5000",               // Local backend URL
 });
 
 // Attach token to requests if available

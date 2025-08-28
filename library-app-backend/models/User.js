@@ -6,7 +6,7 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
-  profilePic: { type: String, default: '/images/new-default.jpeg' },
+  profilePic: { type: String, default: '/images/new-default.png' },
   issuedBooks: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Book'

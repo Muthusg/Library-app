@@ -19,10 +19,22 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Login API expects { identifier, password }
-      const { data } = await API.post("/auth/login", { identifier, password });
+      // Trim inputs to remove accidental spaces
+      const trimmedIdentifier = identifier.trim();
+      const trimmedPassword = password.trim();
 
-      // Assuming backend returns data like { token, user: { id, username, role, ... } }
+      console.log("Sending login payload:", {
+        identifier: trimmedIdentifier,
+        password: trimmedPassword,
+      });
+
+      // Login API expects { identifier, password }
+      const { data } = await API.post("/auth/login", {
+        identifier: trimmedIdentifier,
+        password: trimmedPassword,
+      });
+
+      // Check backend response
       if (!data.token || !data.user) {
         toast.error("Invalid response from server");
         setLoading(false);
@@ -41,6 +53,7 @@ export default function Login() {
         navigate("/home");
       }
     } catch (err) {
+      console.error("Login error:", err.response?.data || err.message);
       toast.error(err.response?.data?.message || "Login failed!");
     } finally {
       setLoading(false);

@@ -51,7 +51,7 @@ router.post('/register', async (req, res) => {
     const newUser = new User({
       username,
       email,
-      password: hashedPassword,
+      password,
       role: 'user',
       profilePic: '', // fixed field name
     });
@@ -64,24 +64,51 @@ router.post('/register', async (req, res) => {
 });
 
 // ===== LOGIN =====
-router.post('/login', async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
     const { identifier, password } = req.body;
-    if (!identifier || !password)
-      return res.status(400).json({ message: 'Username/email and password are required' });
 
-    const user = await User.findOne({ $or: [{ username: identifier }, { email: identifier }] });
-    if (!user) return res.status(400).json({ message: 'User not found' });
+    // Validate input
+    if (!identifier || !password) {
+      console.log("❌ Missing identifier or password:", req.body);
+      return res.status(400).json({ message: "Username/email and password are required" });
+    }
 
+    // Find user by username or email
+    const user = await User.findOne({
+      $or: [{ username: identifier }, { email: identifier }],
+    });
+
+    if (!user) {
+      console.log("❌ User not found for identifier:", identifier);
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Incorrect password' });
+    if (!isMatch) {
+      console.log("❌ Incorrect password for user:", identifier);
+      return res.status(400).json({ message: "Incorrect password" });
+    }
 
+    // Generate JWT token
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: "1h" }
     );
 
+    // Format profile picture URL
+    let profilePicUrl = null;
+    if (user.profilePic) {
+      profilePicUrl = user.profilePic.startsWith("http")
+        ? user.profilePic
+        : `${req.protocol}://${req.get("host")}${user.profilePic}?t=${Date.now()}`;
+    }
+
+    console.log("✅ Login successful for user:", identifier);
+
+    // Send response
     res.status(200).json({
       token,
       user: {
@@ -89,14 +116,12 @@ router.post('/login', async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        profilePic: user.profilePic
-          ? `${req.protocol}://${req.get('host')}${user.profilePic}?t=${Date.now()}`
-          : null,
+        profilePic: profilePicUrl,
       },
     });
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error("🔥 Login error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -160,26 +185,6 @@ router.put('/profile', verifyToken, upload.single('profilePic'), async (req, res
     res.status(200).json(updatedUser);
   } catch (err) {
     console.error('Profile update error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// ===== REMOVE PROFILE PICTURE =====
-router.delete('/profile/picture', verifyToken, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    if (user.profilePic) {
-      const oldPath = path.join(__dirname, '..', user.profilePic.replace(/^\//, ''));
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath); // delete file
-      user.profilePic = ''; // remove URL from DB
-      await user.save();
-    }
-
-    res.status(200).json({ message: 'Profile picture removed successfully', profilePic: null });
-  } catch (err) {
-    console.error('Remove profile picture error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

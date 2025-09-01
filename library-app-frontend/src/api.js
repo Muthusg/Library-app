@@ -6,7 +6,7 @@ const API = axios.create({
              ? "https://library-app-jbyf.onrender.com"
              : "http://localhost:5000"),
 });
-
+console.log("API URL:", process.env.REACT_APP_API_URL);
 // Attach token to requests if available
 API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
